@@ -1,0 +1,16 @@
+# Xcode build artifacts
+native/build/
+native/DerivedData/
+xcuserdata/
+**/*.xcuserstate
+**/*.xcworkspace/contents.xcworkspacedata
+
+# macOS junk
+.DS_Store
+**/.DS_Store
+
+# venv
+.venv/
+
+# Claude Code local settings
+.claude/

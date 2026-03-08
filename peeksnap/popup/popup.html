@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PeekSnap</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 220px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #cba6f7;
+      margin-bottom: 12px;
+    }
+
+    #capture-btn {
+      width: 100%;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+
+    #capture-btn:hover { background: #4f46e5; }
+    #capture-btn:active { background: #4338ca; }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 10px;
+      color: #6c7086;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* ── Settings ── */
+    #settings-toggle {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #a6adc8;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    #settings-toggle:hover { color: #cdd6f4; }
+    #settings-toggle::before {
+      content: "▶";
+      font-size: 8px;
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    #settings-toggle.open::before { transform: rotate(90deg); }
+
+    #settings-panel {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.2s ease;
+    }
+    #settings-panel.open { max-height: 120px; }
+
+    #color-swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 0 8px;
+    }
+
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+    }
+
+    .settings-actions {
+      display: flex;
+      gap: 6px;
+      padding-bottom: 4px;
+    }
+    #add-color-btn,
+    #reset-colors-btn {
+      background: #313244;
+      border: 1px solid #45475a;
+      color: #a6adc8;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    #add-color-btn:hover,
+    #reset-colors-btn:hover { background: #45475a; color: #cdd6f4; }
+    #add-color-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    #add-color-btn:disabled:hover { background: #313244; color: #a6adc8; }
+  </style>
+</head>
+<body>
+  <h1>PeekSnap</h1>
+  <button id="capture-btn">
+    <span>&#9654;</span> Capture Region
+  </button>
+  <p class="hint">Drag to select any area on the page.</p>
+
+  <div id="settings-toggle">Tag Colors</div>
+  <div id="settings-panel">
+    <div id="color-swatches"></div>
+    <div class="settings-actions">
+      <button id="add-color-btn">+ Add</button>
+      <button id="reset-colors-btn">Reset</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

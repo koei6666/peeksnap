@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "PeekSnap",
+  "version": "0.1.0",
+  "description": "Select and save visual snippets from any webpage.",
+  "background": {
+    "page": "background/background.html"
+  },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": [
+      "content/overlay.js",
+      "content/sidebar.js",
+      "content/content_script.js"
+    ],
+    "run_at": "document_idle",
+    "all_frames": false
+  }],
+  "permissions": ["activeTab", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": { "128": "icons/icon-128.png" }
+  },
+  "icons": { "128": "icons/icon-128.png" }
+}
