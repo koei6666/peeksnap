@@ -13,7 +13,14 @@
       color: #cdd6f4;
       font-family: system-ui, -apple-system, sans-serif;
       padding: 16px;
+      transition: width 0.15s ease;
     }
+    body.manager-active { width: 320px; }
+
+    .view { display: flex; flex-direction: column; }
+    .hidden { display: none !important; }
+
+    /* ── Main view ── */
 
     h1 {
       font-size: 14px;
@@ -39,7 +46,6 @@
       gap: 6px;
       transition: background 0.15s;
     }
-
     #capture-btn:hover { background: #4f46e5; }
     #capture-btn:active { background: #4338ca; }
 
@@ -50,6 +56,24 @@
       text-align: center;
       line-height: 1.4;
     }
+
+    #manage-btn {
+      margin-top: 12px;
+      width: 100%;
+      background: #313244;
+      border: 1px solid #45475a;
+      color: #a6adc8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.15s, color 0.15s;
+    }
+    #manage-btn:hover { background: #45475a; color: #cdd6f4; }
 
     /* ── Settings ── */
     #settings-toggle {
@@ -114,22 +138,179 @@
       cursor: not-allowed;
     }
     #add-color-btn:disabled:hover { background: #313244; color: #a6adc8; }
+
+    /* ── Manager view ── */
+
+    #manager-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 8px;
+    }
+
+    #back-btn {
+      background: none;
+      border: none;
+      color: #a6adc8;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    #back-btn:hover { color: #cdd6f4; }
+
+    #manager-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #cba6f7;
+      flex: 1;
+      text-align: center;
+    }
+
+    #clear-all-popup-btn {
+      background: none;
+      border: 1px solid #45475a;
+      color: #f38ba8;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      transition: background 0.1s;
+    }
+    #clear-all-popup-btn:hover { background: #45475a; }
+    #clear-all-popup-btn[data-confirming] {
+      background: #f38ba8;
+      color: #1e1e2e;
+      border-color: #f38ba8;
+    }
+
+    #manager-list {
+      max-height: 380px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #45475a transparent;
+    }
+
+    .manager-group {
+      margin-top: 4px;
+    }
+
+    .manager-group-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6c7086;
+      padding: 8px 0 4px;
+      border-bottom: 1px solid #313244;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .manager-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #1e1e2e;
+    }
+
+    .manager-color-dot {
+      width: 4px;
+      align-self: stretch;
+      border-radius: 2px;
+      flex-shrink: 0;
+      background: transparent;
+    }
+
+    .manager-thumb {
+      width: 44px;
+      height: 32px;
+      object-fit: cover;
+      border-radius: 3px;
+      border: 1px solid #45475a;
+      background: #313244;
+      flex-shrink: 0;
+    }
+
+    .manager-info {
+      flex: 1;
+      overflow: hidden;
+    }
+    .manager-name {
+      font-size: 11px;
+      font-weight: 500;
+      color: #cdd6f4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .manager-date {
+      font-size: 9px;
+      color: #6c7086;
+      margin-top: 2px;
+    }
+
+    .manager-delete-btn {
+      background: none;
+      border: none;
+      color: #6c7086;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .manager-delete-btn:hover { background: #45475a; color: #f38ba8; }
+
+    #manager-empty {
+      text-align: center;
+      padding: 32px 0;
+      color: #6c7086;
+      font-size: 11px;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
-  <h1>PeekSnap</h1>
-  <button id="capture-btn">
-    <span>&#9654;</span> Capture Region
-  </button>
-  <p class="hint">Drag to select any area on the page.</p>
 
-  <div id="settings-toggle">Tag Colors</div>
-  <div id="settings-panel">
-    <div id="color-swatches"></div>
-    <div class="settings-actions">
-      <button id="add-color-btn">+ Add</button>
-      <button id="reset-colors-btn">Reset</button>
+  <!-- ── Main view ── -->
+  <div id="main-view" class="view">
+    <h1>PeekSnap</h1>
+    <button id="capture-btn">
+      <span>&#9654;</span> Capture Region
+    </button>
+    <p class="hint">Drag to select any area on the page.</p>
+
+    <button id="manage-btn">
+      <span>Manage Snaps</span>
+      <span>→</span>
+    </button>
+
+    <div id="settings-toggle">Tag Colors</div>
+    <div id="settings-panel">
+      <div id="color-swatches"></div>
+      <div class="settings-actions">
+        <button id="add-color-btn">+ Add</button>
+        <button id="reset-colors-btn">Reset</button>
+      </div>
     </div>
+  </div>
+
+  <!-- ── Manager view ── -->
+  <div id="manager-view" class="view hidden">
+    <div id="manager-header">
+      <button id="back-btn">← Back</button>
+      <span id="manager-title">All Snaps</span>
+      <button id="clear-all-popup-btn">Clear All</button>
+    </div>
+    <div id="manager-list"></div>
+    <div id="manager-empty" class="hidden">No snaps saved yet.</div>
   </div>
 
   <script src="popup.js"></script>

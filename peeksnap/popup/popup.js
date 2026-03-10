@@ -1,15 +1,35 @@
 /**
  * popup.js — PeekSnap toolbar popup script.
  *
- * Two responsibilities:
- *   1. "Capture Region" button: send activate_selection to active tab, then
- *      close popup immediately (critical — popup blocks mouse events during drag).
- *   2. "Tag Colors" settings panel: load/save preset colors in
- *      browser.storage.local["peeksnap_settings"].
+ * Two views:
+ *   Main:    "Capture Region" button + "Manage Snaps" link + Tag Colors settings
+ *   Manager: All snippets across every URL, grouped by hostname, with delete + Clear All
  */
 
 const DEFAULT_COLORS = ["#fde047", "#22d3ee", "#f0abfc"];
 const SETTINGS_KEY = "peeksnap_settings";
+
+// ── View switching ────────────────────────────────────────────────────────────
+
+const mainView    = document.getElementById("main-view");
+const managerView = document.getElementById("manager-view");
+
+function showMain() {
+  document.body.classList.remove("manager-active");
+  managerView.classList.add("hidden");
+  mainView.classList.remove("hidden");
+  resetClearAllConfirm();
+}
+
+function showManager() {
+  document.body.classList.add("manager-active");
+  mainView.classList.add("hidden");
+  managerView.classList.remove("hidden");
+  loadManagerSnippets();
+}
+
+document.getElementById("back-btn").addEventListener("click", showMain);
+document.getElementById("manage-btn").addEventListener("click", showManager);
 
 // ── Capture ──────────────────────────────────────────────────────────────────
 
@@ -29,7 +49,7 @@ document.getElementById("capture-btn").addEventListener("click", async () => {
 // ── Settings panel toggle ─────────────────────────────────────────────────────
 
 const settingsToggle = document.getElementById("settings-toggle");
-const settingsPanel = document.getElementById("settings-panel");
+const settingsPanel  = document.getElementById("settings-panel");
 
 settingsToggle.addEventListener("click", () => {
   settingsToggle.classList.toggle("open");
@@ -93,12 +113,10 @@ function hslToHex(h, s, l) {
 
 function generateTonalColor(existingColors) {
   const hsls = existingColors.map(hexToHsl);
-  // Average saturation + lightness of the existing palette for tonal consistency
   const avgS = hsls.reduce((sum, [, s]) => sum + s, 0) / hsls.length;
   const avgL = hsls.reduce((sum, [, , l]) => sum + l, 0) / hsls.length;
   const existingHues = hsls.map(([h]) => h);
 
-  // Try up to 20 random hues; pick first one that's ≥30° away from all existing
   for (let attempt = 0; attempt < 20; attempt++) {
     const h = Math.random() * 360;
     const minDist = Math.min(...existingHues.map((eh) => {
@@ -111,7 +129,6 @@ function generateTonalColor(existingColors) {
       return hslToHex(h, s, l);
     }
   }
-  // Fallback if all hues are crowded
   return hslToHex(Math.random() * 360, Math.max(70, avgS), Math.max(65, avgL));
 }
 
@@ -121,7 +138,6 @@ async function renderSwatches() {
   const colors = await loadColors();
   const container = document.getElementById("color-swatches");
 
-  // Clear previous swatches
   while (container.firstChild) container.removeChild(container.firstChild);
 
   colors.forEach((color) => {
@@ -132,7 +148,6 @@ async function renderSwatches() {
     container.appendChild(swatch);
   });
 
-  // Update "+ Add" button state
   const atMax = colors.length >= 5;
   addColorBtn.disabled = atMax;
   addColorBtn.title = atMax ? "Maximum of 5 colors" : "";
@@ -152,5 +167,157 @@ document.getElementById("reset-colors-btn").addEventListener("click", async () =
   renderSwatches();
 });
 
-// Initial render
+// ── Manager: snippet list ─────────────────────────────────────────────────────
+
+let _managerSnippets = [];
+
+async function loadManagerSnippets() {
+  const list  = document.getElementById("manager-list");
+  const empty = document.getElementById("manager-empty");
+  list.textContent = "Loading…";
+  empty.classList.add("hidden");
+
+  try {
+    const response = await browser.runtime.sendMessage({ action: "get_all_snippets" });
+    _managerSnippets = response.snippets ?? [];
+    renderManagerList();
+  } catch (err) {
+    list.textContent = "";
+    empty.textContent = "Could not load snaps.";
+    empty.classList.remove("hidden");
+  }
+}
+
+function renderManagerList() {
+  const list  = document.getElementById("manager-list");
+  const empty = document.getElementById("manager-empty");
+  const clearBtn = document.getElementById("clear-all-popup-btn");
+  list.textContent = "";
+
+  if (!_managerSnippets.length) {
+    empty.textContent = "No snaps saved yet.";
+    empty.classList.remove("hidden");
+    clearBtn.disabled = true;
+    clearBtn.style.opacity = "0.4";
+    return;
+  }
+
+  empty.classList.add("hidden");
+  clearBtn.disabled = false;
+  clearBtn.style.opacity = "";
+
+  // Group by hostname
+  const groups = new Map();
+  for (const s of _managerSnippets) {
+    let host;
+    try { host = new URL(s.pageUrl).hostname; } catch { host = s.pageUrl; }
+    if (!groups.has(host)) groups.set(host, []);
+    groups.get(host).push(s);
+  }
+
+  for (const [host, snippets] of groups) {
+    const group = document.createElement("div");
+    group.className = "manager-group";
+
+    const label = document.createElement("div");
+    label.className = "manager-group-label";
+    label.textContent = host;
+    label.title = host;
+    group.appendChild(label);
+
+    for (const snippet of snippets) {
+      group.appendChild(buildManagerItem(snippet));
+    }
+    list.appendChild(group);
+  }
+}
+
+function buildManagerItem(snippet) {
+  const item = document.createElement("div");
+  item.className = "manager-item";
+  item.dataset.snippetId = snippet.id;
+
+  const colorDot = document.createElement("div");
+  colorDot.className = "manager-color-dot";
+  if (snippet.colorTag) colorDot.style.background = snippet.colorTag;
+
+  const thumb = document.createElement("img");
+  thumb.className = "manager-thumb";
+  thumb.src = snippet.thumbDataUrl || "";
+  thumb.alt = "";
+
+  const info = document.createElement("div");
+  info.className = "manager-info";
+
+  const name = document.createElement("div");
+  name.className = "manager-name";
+  const primaryLabel = snippet.name || snippet.label || "Untitled";
+  name.textContent = primaryLabel;
+  name.title = primaryLabel;
+
+  const date = new Date(snippet.createdAt);
+  const dateStr =
+    date.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    " " +
+    date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+  const dateEl = document.createElement("div");
+  dateEl.className = "manager-date";
+  dateEl.textContent = dateStr;
+
+  info.appendChild(name);
+  info.appendChild(dateEl);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "manager-delete-btn";
+  deleteBtn.title = "Delete snippet";
+  deleteBtn.textContent = "✕";
+  deleteBtn.addEventListener("click", () => deleteManagerSnippet(snippet.id, item));
+
+  item.appendChild(colorDot);
+  item.appendChild(thumb);
+  item.appendChild(info);
+  item.appendChild(deleteBtn);
+  return item;
+}
+
+async function deleteManagerSnippet(id, itemEl) {
+  await browser.runtime.sendMessage({ action: "delete_snippet", id });
+  _managerSnippets = _managerSnippets.filter((s) => s.id !== id);
+
+  // Remove the item row; if its group is now empty, remove the group too
+  const group = itemEl.closest(".manager-group");
+  itemEl.remove();
+  if (group && !group.querySelector(".manager-item")) group.remove();
+
+  // Re-evaluate empty state and button
+  if (!_managerSnippets.length) renderManagerList();
+}
+
+// ── Manager: Clear All ────────────────────────────────────────────────────────
+
+const clearAllPopupBtn = document.getElementById("clear-all-popup-btn");
+
+function resetClearAllConfirm() {
+  clearAllPopupBtn.textContent = "Clear All";
+  delete clearAllPopupBtn.dataset.confirming;
+}
+
+clearAllPopupBtn.addEventListener("click", async () => {
+  if (!clearAllPopupBtn.dataset.confirming) {
+    // First click — ask for confirmation
+    clearAllPopupBtn.dataset.confirming = "1";
+    clearAllPopupBtn.textContent = "Sure?";
+    setTimeout(resetClearAllConfirm, 3000); // auto-reset after 3 s
+    return;
+  }
+
+  resetClearAllConfirm();
+  await browser.runtime.sendMessage({ action: "clear_all_snippets" });
+  _managerSnippets = [];
+  renderManagerList();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 renderSwatches();

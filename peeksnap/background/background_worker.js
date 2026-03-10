@@ -76,6 +76,26 @@ const SnippetStore = {
     });
   },
 
+  getAll() {
+    return getTx("readonly").then((store) => {
+      return new Promise((resolve, reject) => {
+        const results = [];
+        const req = store.index("by_date").openCursor(null, "prev"); // newest first
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const { fullBlob, ...meta } = cursor.value;
+            results.push(meta);
+            cursor.continue();
+          } else {
+            resolve(results);
+          }
+        };
+        req.onerror = () => reject(req.error);
+      });
+    });
+  },
+
   delete(id) {
     return getTx("readwrite").then((s) => idbPromise(s.delete(id)));
   },
@@ -126,6 +146,25 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "delete_snippet":
       SnippetStore.delete(message.id)
+        .then(() => sendResponse({ ok: true }))
+        .catch((err) => sendResponse({ error: err.message }));
+      return true;
+
+    case "get_all_snippets":
+      SnippetStore.getAll()
+        .then(async (snippets) => {
+          const safe = await Promise.all(snippets.map(async (s) => {
+            const thumbDataUrl = s.thumbBlob ? await blobToDataUrl(s.thumbBlob) : null;
+            const { thumbBlob: _tb, ...meta } = s;
+            return { ...meta, thumbDataUrl };
+          }));
+          sendResponse({ snippets: safe });
+        })
+        .catch((err) => sendResponse({ error: err.message }));
+      return true;
+
+    case "clear_all_snippets":
+      SnippetStore.clear()
         .then(() => sendResponse({ ok: true }))
         .catch((err) => sendResponse({ error: err.message }));
       return true;

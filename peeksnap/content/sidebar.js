@@ -95,14 +95,39 @@
 
     /* ── Panel header ── */
     #panel-header {
-      padding: 12px 14px 8px;
+      padding: 10px 14px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #313244;
+      flex-shrink: 0;
+    }
+
+    #panel-header-title {
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: #a6adc8;
-      border-bottom: 1px solid #313244;
+    }
+
+    #clear-all-btn {
+      background: none;
+      border: 1px solid #45475a;
+      color: #6c7086;
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: background 0.1s, color 0.1s;
       flex-shrink: 0;
+    }
+    #clear-all-btn:hover { background: #45475a; color: #f38ba8; border-color: #f38ba8; }
+    #clear-all-btn[data-confirming] {
+      background: #f38ba8;
+      color: #1e1e2e;
+      border-color: #f38ba8;
     }
 
     /* ── Snippet list ── */
@@ -247,7 +272,18 @@
 
       const header = document.createElement("div");
       header.id = "panel-header";
-      header.textContent = "PeekSnap";
+
+      const headerTitle = document.createElement("span");
+      headerTitle.id = "panel-header-title";
+      headerTitle.textContent = "PeekSnap";
+
+      this._clearAllBtn = document.createElement("button");
+      this._clearAllBtn.id = "clear-all-btn";
+      this._clearAllBtn.textContent = "Clear all";
+      this._clearAllBtn.addEventListener("click", () => this._onClearAll());
+
+      header.appendChild(headerTitle);
+      header.appendChild(this._clearAllBtn);
 
       this._list = document.createElement("div");
       this._list.id = "snippet-list";
@@ -472,9 +508,35 @@
       const id = item?.dataset.snippetId;
       if (!id) return;
 
+      this._hidePreview();
       browser.runtime.sendMessage({ action: "delete_snippet", id }).then(() => {
         this._snippets = this._snippets.filter((s) => s.id !== id);
         this.render(this._snippets);
+        // Remove the capture dot for this snippet from the page
+        document.querySelectorAll(`[data-snippet-id="${id}"]`).forEach((el) => el.remove());
+      });
+    }
+
+    _onClearAll() {
+      if (!this._clearAllBtn.dataset.confirming) {
+        this._clearAllBtn.dataset.confirming = "1";
+        this._clearAllBtn.textContent = "Sure?";
+        this._clearAllConfirmTimer = setTimeout(() => {
+          this._clearAllBtn.textContent = "Clear all";
+          delete this._clearAllBtn.dataset.confirming;
+        }, 3000);
+        return;
+      }
+
+      clearTimeout(this._clearAllConfirmTimer);
+      this._clearAllBtn.textContent = "Clear all";
+      delete this._clearAllBtn.dataset.confirming;
+
+      browser.runtime.sendMessage({ action: "clear_all_snippets" }).then(() => {
+        this._snippets = [];
+        this.render([]);
+        // Remove all capture dots from the page
+        document.querySelectorAll("[data-peeksnap][data-snippet-id]").forEach((el) => el.remove());
       });
     }
 
