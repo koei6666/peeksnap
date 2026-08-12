@@ -7,6 +7,7 @@
  *   2. Load existing snippets for this page URL from storage
  *   3. Listen for messages from the background worker
  *   4. Coordinate the selection overlay → capture → sidebar flow
+ *   5. Mount the marker and relay sidebar tool events to it
  */
 
 (function () {
@@ -24,6 +25,44 @@
   const marker = document.createElement("peeksnap-marker");
   marker.dataset.peeksnap = "1";
   document.body.appendChild(marker);
+
+  // The sidebar owns the buttons but knows nothing about why highlighting may
+  // be unavailable, so the orchestration layer relays it.
+  sidebar.setHighlighterEnabled(marker.canHighlight);
+
+  let activeTool = null;
+
+  sidebar.addEventListener("peeksnap:tool-change", (e) => {
+    activeTool = e.detail.tool;
+    marker.setTool(activeTool);
+  });
+
+  sidebar.addEventListener("peeksnap:mark-color", (e) => {
+    marker.setColor(e.detail.color);
+  });
+
+  sidebar.addEventListener("peeksnap:clear-marks", () => {
+    marker.clear();
+  });
+
+  // ── Marking Keyboard Shortcuts ──────────────────────────────────────────────
+  // Only live while a tool is active, so the page keeps its own undo.
+
+  window.addEventListener("keydown", (e) => {
+    if (!activeTool) return;
+
+    if (e.key === "Escape") {
+      activeTool = null;
+      marker.setTool(null);
+      sidebar.setActiveTool(null);
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      marker.undo();
+    }
+  });
 
   // ── DOM-Order Defense Against Ads ────────────────────────────────────────────
   // Re-append all PeekSnap elements to the end of document.body whenever any
