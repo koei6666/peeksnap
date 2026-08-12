@@ -36,6 +36,10 @@
 		7954907D2F5D341300045217 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 795490782F5D341300045217 /* manifest.json */; };
 		7954907E2F5D341300045217 /* background in Resources */ = {isa = PBXBuildFile; fileRef = 795490742F5D341300045217 /* background */; };
 		7954907F2F5D341300045217 /* popup in Resources */ = {isa = PBXBuildFile; fileRef = 795490752F5D341300045217 /* popup */; };
+		AA10000000000000000000B1 /* viewer in Resources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* viewer */; };
+		AA10000000000000000000B2 /* viewer in Resources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A1 /* viewer */; };
+		AA10000000000000000000B3 /* vendor in Resources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A2 /* vendor */; };
+		AA10000000000000000000B4 /* vendor in Resources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000A2 /* vendor */; };
 		795490802F5D341300045217 /* content in Resources */ = {isa = PBXBuildFile; fileRef = 795490762F5D341300045217 /* content */; };
 		795490812F5D341300045217 /* icons in Resources */ = {isa = PBXBuildFile; fileRef = 795490772F5D341300045217 /* icons */; };
 		795490822F5D341300045217 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 795490782F5D341300045217 /* manifest.json */; };
@@ -109,6 +113,8 @@
 		795490542F5D341300045217 /* PeekSnap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PeekSnap.entitlements; sourceTree = "<group>"; };
 		795490742F5D341300045217 /* background */ = {isa = PBXFileReference; lastKnownFileType = folder; name = background; path = ../../../peeksnap/background; sourceTree = "<group>"; };
 		795490752F5D341300045217 /* popup */ = {isa = PBXFileReference; lastKnownFileType = folder; name = popup; path = ../../../peeksnap/popup; sourceTree = "<group>"; };
+		AA10000000000000000000A1 /* viewer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = viewer; path = ../../../peeksnap/viewer; sourceTree = "<group>"; };
+		AA10000000000000000000A2 /* vendor */ = {isa = PBXFileReference; lastKnownFileType = folder; name = vendor; path = ../../../peeksnap/vendor; sourceTree = "<group>"; };
 		795490762F5D341300045217 /* content */ = {isa = PBXFileReference; lastKnownFileType = folder; name = content; path = ../../../peeksnap/content; sourceTree = "<group>"; };
 		795490772F5D341300045217 /* icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = icons; path = ../../../peeksnap/icons; sourceTree = "<group>"; };
 		795490782F5D341300045217 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../../peeksnap/manifest.json; sourceTree = "<group>"; };
@@ -245,6 +251,8 @@
 			children = (
 				795490742F5D341300045217 /* background */,
 				795490752F5D341300045217 /* popup */,
+				AA10000000000000000000A1 /* viewer */,
+				AA10000000000000000000A2 /* vendor */,
 				795490762F5D341300045217 /* content */,
 				795490772F5D341300045217 /* icons */,
 				795490782F5D341300045217 /* manifest.json */,
@@ -419,6 +427,8 @@
 				795490822F5D341300045217 /* manifest.json in Resources */,
 				7954907E2F5D341300045217 /* background in Resources */,
 				7954907F2F5D341300045217 /* popup in Resources */,
+				AA10000000000000000000B1 /* viewer in Resources */,
+				AA10000000000000000000B3 /* vendor in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -431,6 +441,8 @@
 				7954907D2F5D341300045217 /* manifest.json in Resources */,
 				795490792F5D341300045217 /* background in Resources */,
 				7954907A2F5D341300045217 /* popup in Resources */,
+				AA10000000000000000000B2 /* viewer in Resources */,
+				AA10000000000000000000B4 /* vendor in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
