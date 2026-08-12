@@ -3,7 +3,13 @@
  *
  * Session-only on-page marks. Two tools:
  *   highlighter — paints text selections via the CSS Custom Highlight API
- *   brush       — freehand strokes on a viewport-fixed canvas
+ *   brush       — freehand strokes anchored to document coordinates
+ *
+ * Stroke points are stored in DOCUMENT space so drawings stay on the content
+ * they were drawn over while scrolling. The canvas stays viewport-sized and
+ * fixed, repainting with the scroll offset subtracted, so memory does not
+ * scale with page length. On Safari PDF pages scrollX/scrollY are always 0,
+ * so this degrades to viewport-fixed with no branching.
  *
  * Marks are never persisted and vanish on reload. They ARE rendered by
  * captureVisibleTab, so a snap taken over a mark bakes it into the PNG.
@@ -98,7 +104,9 @@
       this._shadow.appendChild(this._canvas);
       this._ctx = this._canvas.getContext("2d");
 
+      this._scrollRaf = 0;
       this._onResize = this._onResize.bind(this);
+      this._onScroll = this._onScroll.bind(this);
       this._onPointerDown = this._onPointerDown.bind(this);
       this._onPointerMove = this._onPointerMove.bind(this);
       this._onPointerUp = this._onPointerUp.bind(this);
@@ -122,6 +130,7 @@
       this._renderStrokes();
       this._renderHighlights();
       window.addEventListener("resize", this._onResize);
+      window.addEventListener("scroll", this._onScroll, { passive: true });
       this._canvas.addEventListener("pointerdown", this._onPointerDown);
       this._canvas.addEventListener("pointermove", this._onPointerMove);
       this._canvas.addEventListener("pointerup", this._onPointerUp);
@@ -131,6 +140,7 @@
 
     disconnectedCallback() {
       window.removeEventListener("resize", this._onResize);
+      window.removeEventListener("scroll", this._onScroll);
       this._canvas.removeEventListener("pointerdown", this._onPointerDown);
       this._canvas.removeEventListener("pointermove", this._onPointerMove);
       this._canvas.removeEventListener("pointerup", this._onPointerUp);
@@ -207,7 +217,7 @@
       this._drawing = true;
       this._current = {
         type: "stroke",
-        points: [{ x: e.clientX, y: e.clientY }],
+        points: [{ x: e.clientX + window.scrollX, y: e.clientY + window.scrollY }],
         color: this._color,
         width: STROKE_WIDTH,
       };
@@ -219,7 +229,10 @@
 
     _onPointerMove(e) {
       if (!this._drawing || !this._current) return;
-      this._current.points.push({ x: e.clientX, y: e.clientY });
+      this._current.points.push({
+        x: e.clientX + window.scrollX,
+        y: e.clientY + window.scrollY,
+      });
       this._renderStrokes();
     }
 
@@ -314,7 +327,21 @@
       this._renderStrokes();
     }
 
+    /**
+     * Points are stored in DOCUMENT space, so strokes stay anchored to the
+     * content they were drawn on. The canvas itself stays viewport-sized and
+     * fixed; scrolling repaints with the current scroll offset subtracted.
+     * Sizing the canvas to the whole document instead would blow up memory on
+     * long pages.
+     *
+     * On Safari PDF pages scrollX/scrollY are permanently 0, so this degrades
+     * to viewport-fixed behavior with no branching — the best available there,
+     * since the PDF plugin scrolls internally and reports nothing.
+     */
     _renderStrokes() {
+      const sx = window.scrollX;
+      const sy = window.scrollY;
+
       this._ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
       this._ctx.lineCap = "round";
       this._ctx.lineJoin = "round";
@@ -329,18 +356,26 @@
         if (mark.points.length === 1) {
           const p = mark.points[0];
           this._ctx.beginPath();
-          this._ctx.arc(p.x, p.y, mark.width / 2, 0, Math.PI * 2);
+          this._ctx.arc(p.x - sx, p.y - sy, mark.width / 2, 0, Math.PI * 2);
           this._ctx.fill();
           continue;
         }
 
         this._ctx.beginPath();
-        this._ctx.moveTo(mark.points[0].x, mark.points[0].y);
+        this._ctx.moveTo(mark.points[0].x - sx, mark.points[0].y - sy);
         for (let i = 1; i < mark.points.length; i++) {
-          this._ctx.lineTo(mark.points[i].x, mark.points[i].y);
+          this._ctx.lineTo(mark.points[i].x - sx, mark.points[i].y - sy);
         }
         this._ctx.stroke();
       }
+    }
+
+    _onScroll() {
+      if (this._scrollRaf) return;
+      this._scrollRaf = requestAnimationFrame(() => {
+        this._scrollRaf = 0;
+        this._renderStrokes();
+      });
     }
   }
 
