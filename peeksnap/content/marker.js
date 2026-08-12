@@ -59,6 +59,9 @@
       this._ctx = this._canvas.getContext("2d");
 
       this._onResize = this._onResize.bind(this);
+      this._onPointerDown = this._onPointerDown.bind(this);
+      this._onPointerMove = this._onPointerMove.bind(this);
+      this._onPointerUp = this._onPointerUp.bind(this);
     }
 
     connectedCallback() {
@@ -74,10 +77,65 @@
 
       this._resizeCanvas();
       window.addEventListener("resize", this._onResize);
+      this._canvas.addEventListener("pointerdown", this._onPointerDown);
+      this._canvas.addEventListener("pointermove", this._onPointerMove);
+      this._canvas.addEventListener("pointerup", this._onPointerUp);
+      this._canvas.addEventListener("pointercancel", this._onPointerUp);
     }
 
     disconnectedCallback() {
       window.removeEventListener("resize", this._onResize);
+      this._canvas.removeEventListener("pointerdown", this._onPointerDown);
+      this._canvas.removeEventListener("pointermove", this._onPointerMove);
+      this._canvas.removeEventListener("pointerup", this._onPointerUp);
+      this._canvas.removeEventListener("pointercancel", this._onPointerUp);
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    setTool(tool) {
+      const next = tool === "brush" || tool === "highlighter" ? tool : null;
+      this._tool = next;
+
+      const brushActive = next === "brush";
+      this._canvas.classList.toggle("active", brushActive);
+      this.style.pointerEvents = brushActive ? "auto" : "none";
+    }
+
+    setColor(hex) {
+      if (typeof hex === "string" && hex) this._color = hex;
+    }
+
+    // ── Brush ─────────────────────────────────────────────────────────────────
+
+    _onPointerDown(e) {
+      if (this._tool !== "brush") return;
+      e.preventDefault();
+
+      this._drawing = true;
+      this._current = {
+        type: "stroke",
+        points: [{ x: e.clientX, y: e.clientY }],
+        color: this._color,
+        width: STROKE_WIDTH,
+      };
+      this._marks.push(this._current);
+
+      this._canvas.setPointerCapture(e.pointerId);
+      this._renderStrokes();
+    }
+
+    _onPointerMove(e) {
+      if (!this._drawing || !this._current) return;
+      this._current.points.push({ x: e.clientX, y: e.clientY });
+      this._renderStrokes();
+    }
+
+    _onPointerUp() {
+      if (!this._drawing) return;
+      this._drawing = false;
+      this._current = null;
+      this._renderStrokes();
     }
 
     // ── Canvas ────────────────────────────────────────────────────────────────
