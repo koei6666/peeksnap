@@ -79,3 +79,10 @@ snippet.colorTag: string  // hex color (default '')
 - Marks do not survive a reload (by design)
 - No eraser; undo and clear-all only
 - Inherits the existing CSS top-layer gap — `<dialog>`/popover ads still cover PeekSnap UI
+
+**Deferred (found in final review, deliberately not fixed):**
+- **Escape double-duty:** with a tool active and a capture overlay open, one Escape both closes the overlay and deactivates the tool. Cosmetic; disambiguating would couple `overlay.js` to the marking feature.
+- **Stale `Range` retention on SPAs:** cloned Ranges keep detached subtrees alive until reload. No error and nothing paints, since `Highlight` over detached ranges is a no-op, and marks are session-only anyway.
+- **No `showError()` path in `marker.js`:** the design doc says failures surface via the toast, but no failure mode in `marker.js` has been identified that can throw. Adding a speculative error path was judged YAGNI.
+
+**Not yet verified:** none of this feature has been run. See `docs/superpowers/plans/2026-08-12-on-page-marking-MANUAL-VERIFICATION.md` — start with section J, which covers the ad-defense re-parenting fix.
