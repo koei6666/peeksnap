@@ -307,6 +307,8 @@
       this._activeTool = null;
       this._tagColors = ["#fde047", "#22d3ee", "#f0abfc"];
       this._colorIndex = 0;
+      this._markColorsReady = false;
+      this._markColorAnnounced = false;
 
       this._buildDOM();
     }
@@ -455,6 +457,18 @@
         // Defaults already set in the constructor
       }
       this._markColorDot.style.background = this._tagColors[this._colorIndex];
+      this._markColorsReady = true;
+      this._emitInitialMarkColor();
+    }
+
+    /**
+     * Announces the resolved initial color exactly once, whichever happens
+     * later — the async storage load (_initMarkColors) or DOM connection
+     * (connectedCallback). Never dispatches while disconnected.
+     */
+    _emitInitialMarkColor() {
+      if (!this._markColorsReady || !this.isConnected || this._markColorAnnounced) return;
+      this._markColorAnnounced = true;
       this.dispatchEvent(new CustomEvent("peeksnap:mark-color", {
         detail: { color: this._tagColors[this._colorIndex] },
         bubbles: true,
@@ -472,6 +486,7 @@
         isolation: "isolate",
         pointerEvents: "none",
       });
+      this._emitInitialMarkColor();
     }
 
     disconnectedCallback() {}
