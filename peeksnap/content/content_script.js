@@ -14,7 +14,7 @@
   // ── Mount Sidebar ───────────────────────────────────────────────────────────
 
   // Build marker — confirms in the console which bundle Safari actually loaded.
-  console.log("[PeekSnap] v0.2.0 content scripts loaded — marking enabled");
+  console.log("[PeekSnap] v0.3.0 content scripts loaded — marking enabled");
 
   // Guard against double-injection
   if (document.querySelector("peeksnap-sidebar")) return;
@@ -29,49 +29,7 @@
   marker.dataset.peeksnap = "1";
   document.body.appendChild(marker);
 
-  // The sidebar owns the buttons but knows nothing about why highlighting may
-  // be unavailable, so the orchestration layer relays it.
-  sidebar.setHighlighterEnabled(marker.canHighlight);
-
-  let activeTool = null;
-
-  sidebar.addEventListener("peeksnap:tool-change", (e) => {
-    activeTool = e.detail.tool;
-    marker.setTool(activeTool);
-  });
-
-  sidebar.addEventListener("peeksnap:mark-color", (e) => {
-    marker.setColor(e.detail.color);
-  });
-
-  sidebar.addEventListener("peeksnap:clear-marks", () => {
-    marker.clear();
-  });
-
-  // ── Marking Keyboard Shortcuts ──────────────────────────────────────────────
-  // Only live while a tool is active, so the page keeps its own undo.
-
-  window.addEventListener("keydown", (e) => {
-    if (!activeTool) return;
-
-    if (e.key === "Escape") {
-      activeTool = null;
-      marker.setTool(null);
-      sidebar.setActiveTool(null);
-      return;
-    }
-
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
-      const t = e.target;
-      const isEditable = t && (t.isContentEditable ||
-        /^(input|textarea|select)$/i.test(t.tagName || ""));
-      if (isEditable) return;
-      if (document.querySelector("peeksnap-overlay")) return;
-
-      e.preventDefault();
-      marker.undo();
-    }
-  });
+  window.PeekSnapMarking.attach(sidebar, marker);
 
   // ── DOM-Order Defense Against Ads ────────────────────────────────────────────
   // Re-append all PeekSnap elements to the end of document.body whenever any
