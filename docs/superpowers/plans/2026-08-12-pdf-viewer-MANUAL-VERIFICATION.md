@@ -70,3 +70,17 @@ Verify marking on regular web pages (non-PDF) still behaves identically after th
 | **Highlighter is greyed out on a text-based PDF** | `canHighlight` returned false when it should be true | Check browser console for errors during text-layer init; verify the PDF has selectable text; check that `document.contentType` is `text/html` (not `application/pdf`) |
 | **"Open PDF in PeekSnap" button never appears** | Safari blocked the `tabs.update()` navigation | Check that the extension has the `tabs` permission in `manifest.json`; verify the popup is allowed to call `browser.tabs.update` |
 
+
+---
+
+## PRIORITY — verify these first (added after the final review's fix wave, commit `9fd19b2`)
+
+The final review found two Critical and three Important defects. All are fixed in code but **none has been run**. Test in this order:
+
+- [ ] **Scanned / image-heavy PDF renders at all.** The manifest previously declared no CSP, so the default `script-src 'self'` blocked `WebAssembly.instantiate` — and PDF.js's WASM decoders (JPEG 2000) are exactly what scanned PDFs need. A `content_security_policy` with `'wasm-unsafe-eval'` was added. If scanned PDFs render blank, this is the first suspect.
+- [ ] **"Capture Region" actually works inside the viewer.** Previously impossible: nothing created a `<peeksnap-overlay>` on the viewer page, because content scripts aren't injected into extension pages and the viewer had no message listener. One was added. Open a PDF in the viewer → popup → Capture Region → the selection overlay must appear, and the saved snap must be listed.
+- [ ] **The viewer still loads at all.** `web_accessible_resources` was removed entirely to stop arbitrary web pages opening the viewer with a crafted `file` parameter. If the viewer fails to load, or PDF.js fails to fetch its worker/wasm/cmaps, restore it narrowed to `{"resources": ["vendor/pdfjs/*"], "matches": ["<all_urls>"]}`.
+- [ ] **Resize a text PDF with a stroke and a highlight on screen.** Marks are now deliberately cleared on a width-changing re-render, with a notice reading "Marks cleared — page was re-rendered at a new size." Height-only resizes must NOT trigger it. Silent mark loss would be a bug; the notice is the intended behavior.
+- [ ] **Resize mid-load on a long PDF** (50+ pages) — watch for duplicate or out-of-order pages. A render-token hole allowed a superseded render to append stale pages; it now re-checks immediately before appending.
+- [ ] **Security check:** open `viewer.html?file=javascript:alert(1)` manually. Expected: an error screen with **no link**, and no script execution. Non-http/https/file URLs are now rejected before both the fetch and the link.
+- [ ] **Viewer captures are labelled by the PDF's host**, not the extension, in the popup's manager screen.
