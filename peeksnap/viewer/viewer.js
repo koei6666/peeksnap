@@ -78,6 +78,25 @@ async function renderPage(page, token) {
   return { wrap, page, viewport };
 }
 
+/**
+ * PDF.js emits absolutely-positioned real DOM text. That is what makes
+ * window.getSelection() work here, which is in turn what lets the existing
+ * highlighter work on PDFs with no changes to marker.js.
+ */
+async function buildTextLayer(wrap, page, viewport) {
+  const layer = document.createElement("div");
+  layer.className = "textLayer";
+  layer.style.setProperty("--total-scale-factor", String(viewport.scale));
+  wrap.appendChild(layer);
+
+  const textLayer = new pdfjsLib.TextLayer({
+    textContentSource: page.streamTextContent(),
+    container: layer,
+    viewport,
+  });
+  await textLayer.render();
+}
+
 async function renderAll() {
   const token = ++renderToken;
   pagesEl.textContent = "";
@@ -86,7 +105,15 @@ async function renderAll() {
     if (token !== renderToken) return;
     try {
       const page = await pdfDoc.getPage(n);
-      await renderPage(page, token);
+      const rendered = await renderPage(page, token);
+      if (rendered) {
+        try {
+          await buildTextLayer(rendered.wrap, rendered.page, rendered.viewport);
+        } catch (err) {
+          // A missing text layer costs highlighting on this page, not the page.
+          console.warn("[PeekSnap] text layer failed", n, err);
+        }
+      }
     } catch (err) {
       // One bad page must not kill the whole document.
       const failed = document.createElement("div");
