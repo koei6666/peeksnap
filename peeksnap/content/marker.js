@@ -151,6 +151,27 @@
       return this._canHighlight;
     }
 
+    /**
+     * Removes the most recent mark of either type. Both renderers run because
+     * a single stack interleaves strokes and highlights — the popped mark's
+     * type is not worth branching on, and a full re-render is cheap.
+     */
+    undo() {
+      if (!this._marks.length) return;
+      this._marks.pop();
+      this._renderStrokes();
+      this._renderHighlights();
+    }
+
+    clear() {
+      this._marks = [];
+      this._drawing = false;
+      this._current = null;
+      this._renderStrokes();
+      this._clearHighlightRegistry();
+      if (this._styleEl) this._styleEl.textContent = "";
+    }
+
     // ── Brush ─────────────────────────────────────────────────────────────────
 
     _onPointerDown(e) {
