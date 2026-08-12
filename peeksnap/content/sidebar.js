@@ -6,9 +6,16 @@
  *   Expanded:  260px panel sliding in from the right
  *
  * Public API:
- *   sidebar.render(snippets)    — full re-render from array
- *   sidebar.addSnippet(snippet) — prepend a new item
- *   sidebar.updateBadge(count)  — refresh the badge
+ *   sidebar.render(snippets)            — full re-render from array
+ *   sidebar.addSnippet(snippet)         — prepend a new item
+ *   sidebar.updateBadge(count)          — refresh the badge
+ *   sidebar.setActiveTool(tool)         — set tool button state without emitting
+ *   sidebar.setHighlighterEnabled(bool) — enable/disable the highlighter button
+ *
+ * Emits (all composed: true, so they escape the closed shadow root):
+ *   peeksnap:tool-change  detail { tool }   — 'highlighter' | 'brush' | null
+ *   peeksnap:mark-color   detail { color }  — hex
+ *   peeksnap:clear-marks
  */
 
 (function () {
@@ -231,6 +238,64 @@
       object-fit: contain;
     }
     #preview-popup.visible { display: block; }
+
+    /* ── Tool row (marking) ── */
+    #tool-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-bottom: 1px solid #313244;
+      flex-shrink: 0;
+    }
+
+    .tool-btn {
+      background: none;
+      border: 1px solid #45475a;
+      color: #a6adc8;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      width: 30px;
+      height: 26px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tool-btn:hover:not(:disabled) { border-color: #6366f1; color: #cdd6f4; }
+    .tool-btn.active {
+      background: #6366f1;
+      border-color: #6366f1;
+      color: #fff;
+    }
+    .tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #mark-color-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #45475a;
+      padding: 0;
+      cursor: pointer;
+      margin-left: 2px;
+    }
+
+    #clear-marks-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid #45475a;
+      color: #6c7086;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 6px;
+      cursor: pointer;
+    }
+    #clear-marks-btn:hover { color: #f38ba8; border-color: #f38ba8; }
   `;
 
   class PeekSnapSidebar extends HTMLElement {
@@ -239,6 +304,9 @@
       this._shadow = this.attachShadow({ mode: "closed" });
       this._expanded = false;
       this._snippets = [];
+      this._activeTool = null;
+      this._tagColors = ["#fde047", "#22d3ee", "#f0abfc"];
+      this._colorIndex = 0;
 
       this._buildDOM();
     }
@@ -289,6 +357,7 @@
       this._list.id = "snippet-list";
 
       this._panel.appendChild(header);
+      this._panel.appendChild(this._buildToolRow());
       this._panel.appendChild(this._list);
       this._shadow.appendChild(this._panel);
 
@@ -303,6 +372,94 @@
 
       // Event delegation for list actions
       this._list.addEventListener("click", (e) => this._onListClick(e));
+    }
+
+    // ── Tool Row (marking) ────────────────────────────────────────────────────
+
+    _buildToolRow() {
+      const row = document.createElement("div");
+      row.id = "tool-row";
+
+      this._highlighterBtn = document.createElement("button");
+      this._highlighterBtn.className = "tool-btn";
+      this._highlighterBtn.textContent = "🖍";
+      this._highlighterBtn.title = "Highlight text";
+      this._highlighterBtn.addEventListener("click", () => this._onToolClick("highlighter"));
+
+      this._brushBtn = document.createElement("button");
+      this._brushBtn.className = "tool-btn";
+      this._brushBtn.textContent = "🖌";
+      this._brushBtn.title = "Draw freehand";
+      this._brushBtn.addEventListener("click", () => this._onToolClick("brush"));
+
+      this._markColorDot = document.createElement("button");
+      this._markColorDot.id = "mark-color-dot";
+      this._markColorDot.title = "Cycle mark color";
+      this._markColorDot.style.background = this._tagColors[0];
+      this._markColorDot.addEventListener("click", () => this._onMarkColorClick());
+
+      this._clearMarksBtn = document.createElement("button");
+      this._clearMarksBtn.id = "clear-marks-btn";
+      this._clearMarksBtn.textContent = "Clear marks";
+      this._clearMarksBtn.addEventListener("click", () => {
+        this.dispatchEvent(new CustomEvent("peeksnap:clear-marks", {
+          bubbles: true,
+          composed: true,
+        }));
+      });
+
+      row.appendChild(this._highlighterBtn);
+      row.appendChild(this._brushBtn);
+      row.appendChild(this._markColorDot);
+      row.appendChild(this._clearMarksBtn);
+
+      this._initMarkColors();
+      return row;
+    }
+
+    _onToolClick(tool) {
+      const next = this._activeTool === tool ? null : tool;
+      this.setActiveTool(next);
+      this.dispatchEvent(new CustomEvent("peeksnap:tool-change", {
+        detail: { tool: next },
+        bubbles: true,
+        composed: true,
+      }));
+    }
+
+    _onMarkColorClick() {
+      if (!this._tagColors.length) return;
+      this._colorIndex = (this._colorIndex + 1) % this._tagColors.length;
+      const color = this._tagColors[this._colorIndex];
+      this._markColorDot.style.background = color;
+      this.dispatchEvent(new CustomEvent("peeksnap:mark-color", {
+        detail: { color },
+        bubbles: true,
+        composed: true,
+      }));
+    }
+
+    /** Reads the shared tag palette. Read-only — never writes settings. */
+    async _initMarkColors() {
+      try {
+        const data = await browser.storage.local.get("peeksnap_settings");
+        const settings = data["peeksnap_settings"] || {};
+        if (Array.isArray(settings.tagColors) && settings.tagColors.length) {
+          this._tagColors = settings.tagColors;
+        }
+        if (settings.lastUsedColor) {
+          const idx = this._tagColors.indexOf(settings.lastUsedColor);
+          this._colorIndex = idx >= 0 ? idx : 0;
+        }
+      } catch (_) {
+        // Defaults already set in the constructor
+      }
+      this._markColorDot.style.background = this._tagColors[this._colorIndex];
+      this.dispatchEvent(new CustomEvent("peeksnap:mark-color", {
+        detail: { color: this._tagColors[this._colorIndex] },
+        bubbles: true,
+        composed: true,
+      }));
     }
 
     connectedCallback() {
@@ -359,6 +516,20 @@
     updateBadge(count) {
       this._badge.textContent = String(count);
       this._badge.dataset.count = String(count);
+    }
+
+    /** Sets button state WITHOUT emitting — for external deselection (Escape). */
+    setActiveTool(tool) {
+      this._activeTool = tool;
+      this._highlighterBtn.classList.toggle("active", tool === "highlighter");
+      this._brushBtn.classList.toggle("active", tool === "brush");
+    }
+
+    setHighlighterEnabled(enabled) {
+      this._highlighterBtn.disabled = !enabled;
+      this._highlighterBtn.title = enabled
+        ? "Highlight text"
+        : "Highlighting needs selectable text — unavailable on this page";
     }
 
     // ── Item Builder (safe DOM methods — no innerHTML with user data) ──────────
