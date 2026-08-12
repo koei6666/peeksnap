@@ -13,6 +13,9 @@
 (function () {
   // ── Mount Sidebar ───────────────────────────────────────────────────────────
 
+  // Build marker — confirms in the console which bundle Safari actually loaded.
+  console.log("[PeekSnap] v0.2.0 content scripts loaded — marking enabled");
+
   // Guard against double-injection
   if (document.querySelector("peeksnap-sidebar")) return;
 
