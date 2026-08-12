@@ -1,0 +1,85 @@
+:root { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: #2a2a3a;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+#pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0 64px;
+}
+
+.page {
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  background: #fff;
+}
+
+.page canvas { display: block; }
+
+.page-failed {
+  color: #f38ba8;
+  background: #1e1e2e;
+  padding: 24px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+#error {
+  color: #cdd6f4;
+  background: #1e1e2e;
+  margin: 48px auto;
+  padding: 24px;
+  max-width: 520px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#error a { color: #89b4fa; }
+
+/* ── PDF.js text layer (required for selection/highlighting) ── */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent { display: contents; }

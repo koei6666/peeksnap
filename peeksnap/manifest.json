@@ -20,6 +20,10 @@
   }],
   "permissions": ["activeTab", "storage", "tabs"],
   "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [{
+    "resources": ["viewer/*", "vendor/pdfjs/*"],
+    "matches": ["<all_urls>"]
+  }],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": { "128": "icons/icon-128.png" }
