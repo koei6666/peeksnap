@@ -23,6 +23,38 @@
   if (customElements.get("peeksnap-marker")) return;
 
   const STROKE_WIDTH = 3;
+  const HIGHLIGHT_ALPHA = 0.35;
+  const HIGHLIGHT_PREFIX = "peeksnap-mark";
+
+  /**
+   * Highlighting requires BOTH the CSS Custom Highlight API (Safari 17.2+)
+   * and a document that can actually produce a text selection. Safari's PDF
+   * plugin is not an inspectable document — getSelection() returns nothing
+   * usable from it — and image documents have no text at all.
+   */
+  function supportsHighlight() {
+    if (typeof window.CSS === "undefined" || !window.CSS.highlights) return false;
+    if (typeof window.Highlight === "undefined") return false;
+
+    const type = (document.contentType || "").toLowerCase();
+    if (type === "application/pdf") return false;
+    if (type.startsWith("image/")) return false;
+
+    return true;
+  }
+
+  function hexToRgba(hex, alpha) {
+    const clean = hex.replace("#", "");
+    const full = clean.length === 3
+      ? clean.split("").map((c) => c + c).join("")
+      : clean;
+    const num = parseInt(full, 16);
+    if (Number.isNaN(num)) return `rgba(253, 224, 71, ${alpha})`;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   const STYLE_TEXT = `
     canvas {
@@ -49,6 +81,9 @@
       this._color = "#fde047";
       this._drawing = false;
       this._current = null;
+      this._canHighlight = supportsHighlight();
+      this._highlightNames = [];
+      this._styleEl = null;
 
       const style = document.createElement("style");
       style.textContent = STYLE_TEXT;
@@ -62,6 +97,7 @@
       this._onPointerDown = this._onPointerDown.bind(this);
       this._onPointerMove = this._onPointerMove.bind(this);
       this._onPointerUp = this._onPointerUp.bind(this);
+      this._onDocMouseUp = this._onDocMouseUp.bind(this);
     }
 
     connectedCallback() {
@@ -81,6 +117,7 @@
       this._canvas.addEventListener("pointermove", this._onPointerMove);
       this._canvas.addEventListener("pointerup", this._onPointerUp);
       this._canvas.addEventListener("pointercancel", this._onPointerUp);
+      document.addEventListener("mouseup", this._onDocMouseUp);
     }
 
     disconnectedCallback() {
@@ -89,11 +126,15 @@
       this._canvas.removeEventListener("pointermove", this._onPointerMove);
       this._canvas.removeEventListener("pointerup", this._onPointerUp);
       this._canvas.removeEventListener("pointercancel", this._onPointerUp);
+      document.removeEventListener("mouseup", this._onDocMouseUp);
+      this._clearHighlightRegistry();
+      if (this._styleEl) this._styleEl.remove();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     setTool(tool) {
+      if (tool === "highlighter" && !this._canHighlight) return;
       const next = tool === "brush" || tool === "highlighter" ? tool : null;
       this._tool = next;
 
@@ -104,6 +145,10 @@
 
     setColor(hex) {
       if (typeof hex === "string" && hex) this._color = hex;
+    }
+
+    get canHighlight() {
+      return this._canHighlight;
     }
 
     // ── Brush ─────────────────────────────────────────────────────────────────
@@ -136,6 +181,75 @@
       this._drawing = false;
       this._current = null;
       this._renderStrokes();
+    }
+
+    // ── Highlighter ───────────────────────────────────────────────────────────
+
+    _onDocMouseUp() {
+      if (this._tool !== "highlighter") return;
+
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+
+      const ranges = [];
+      for (let i = 0; i < sel.rangeCount; i++) {
+        ranges.push(sel.getRangeAt(i).cloneRange());
+      }
+      if (!ranges.length) return;
+
+      this._marks.push({ type: "highlight", ranges, color: this._color });
+      sel.removeAllRanges();
+      this._renderHighlights();
+    }
+
+    _ensureHostStyle() {
+      if (this._styleEl && this._styleEl.isConnected) return;
+      this._styleEl = document.createElement("style");
+      this._styleEl.dataset.peeksnap = "1";
+      (document.head || document.documentElement).appendChild(this._styleEl);
+    }
+
+    _clearHighlightRegistry() {
+      for (const name of this._highlightNames) {
+        window.CSS.highlights.delete(name);
+      }
+      this._highlightNames = [];
+    }
+
+    /**
+     * Rebuilds the whole highlight registry from _marks. Rebuilding rather
+     * than incrementally patching keeps undo trivial: drop a mark, re-render.
+     */
+    _renderHighlights() {
+      if (!this._canHighlight) return;
+
+      this._clearHighlightRegistry();
+
+      const byColor = new Map();
+      for (const mark of this._marks) {
+        if (mark.type !== "highlight") continue;
+        if (!byColor.has(mark.color)) byColor.set(mark.color, []);
+        byColor.get(mark.color).push(...mark.ranges);
+      }
+
+      if (!byColor.size) {
+        if (this._styleEl) this._styleEl.textContent = "";
+        return;
+      }
+
+      this._ensureHostStyle();
+
+      const rules = [];
+      let i = 0;
+      for (const [color, ranges] of byColor) {
+        const name = `${HIGHLIGHT_PREFIX}-${i++}`;
+        window.CSS.highlights.set(name, new window.Highlight(...ranges));
+        this._highlightNames.push(name);
+        rules.push(
+          `::highlight(${name}) { background-color: ${hexToRgba(color, HIGHLIGHT_ALPHA)}; }`
+        );
+      }
+      this._styleEl.textContent = rules.join("\n");
     }
 
     // ── Canvas ────────────────────────────────────────────────────────────────
