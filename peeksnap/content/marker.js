@@ -8,6 +8,11 @@
  * Marks are never persisted and vanish on reload. They ARE rendered by
  * captureVisibleTab, so a snap taken over a mark bakes it into the PNG.
  *
+ * The element tolerates being re-parented by content_script.js's ad-defense
+ * MutationObserver, which re-appends every [data-peeksnap] node and thereby
+ * triggers disconnectedCallback()+connectedCallback() synchronously. Marks
+ * are restored (not lost) in connectedCallback().
+ *
  * Public API:
  *   marker.setTool(tool)  — 'highlighter' | 'brush' | null
  *   marker.setColor(hex)
@@ -111,7 +116,11 @@
         "pointer-events: none",
       ].join(";");
 
+      this._applyToolState();
+
       this._resizeCanvas();
+      this._renderStrokes();
+      this._renderHighlights();
       window.addEventListener("resize", this._onResize);
       this._canvas.addEventListener("pointerdown", this._onPointerDown);
       this._canvas.addEventListener("pointermove", this._onPointerMove);
@@ -127,8 +136,15 @@
       this._canvas.removeEventListener("pointerup", this._onPointerUp);
       this._canvas.removeEventListener("pointercancel", this._onPointerUp);
       document.removeEventListener("mouseup", this._onDocMouseUp);
-      this._clearHighlightRegistry();
-      if (this._styleEl) this._styleEl.remove();
+
+      // The ad-defense observer re-parents this element by re-appending it,
+      // which fires disconnectedCallback() then connectedCallback() in the
+      // same task. Defer teardown so a re-parent doesn't wipe live marks.
+      Promise.resolve().then(() => {
+        if (this.isConnected) return; // re-parented, not torn down
+        this._clearHighlightRegistry();
+        if (this._styleEl) this._styleEl.remove();
+      });
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -137,8 +153,17 @@
       if (tool === "highlighter" && !this._canHighlight) return;
       const next = tool === "brush" || tool === "highlighter" ? tool : null;
       this._tool = next;
+      this._applyToolState();
+    }
 
-      const brushActive = next === "brush";
+    /**
+     * Single source of truth for the visual/interactive state that reflects
+     * `_tool`. Called from setTool() and from connectedCallback() (the
+     * latter because re-parenting replaces `style.cssText` wholesale,
+     * resetting pointer-events even though `_tool` hasn't changed).
+     */
+    _applyToolState() {
+      const brushActive = this._tool === "brush";
       this._canvas.classList.toggle("active", brushActive);
       this.style.pointerEvents = brushActive ? "auto" : "none";
     }
@@ -157,6 +182,7 @@
      * type is not worth branching on, and a full re-render is cheap.
      */
     undo() {
+      if (this._drawing) return;
       if (!this._marks.length) return;
       this._marks.pop();
       this._renderStrokes();

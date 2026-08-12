@@ -59,6 +59,12 @@
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+      const t = e.target;
+      const isEditable = t && (t.isContentEditable ||
+        /^(input|textarea|select)$/i.test(t.tagName || ""));
+      if (isEditable) return;
+      if (document.querySelector("peeksnap-overlay")) return;
+
       e.preventDefault();
       marker.undo();
     }
