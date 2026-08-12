@@ -19,6 +19,12 @@
   sidebar.dataset.peeksnap = "1";
   document.body.appendChild(sidebar);
 
+  // ── Mount Marker ────────────────────────────────────────────────────────────
+
+  const marker = document.createElement("peeksnap-marker");
+  marker.dataset.peeksnap = "1";
+  document.body.appendChild(marker);
+
   // ── DOM-Order Defense Against Ads ────────────────────────────────────────────
   // Re-append all PeekSnap elements to the end of document.body whenever any
   // external element is added, ensuring PeekSnap wins z-index ties by DOM order.

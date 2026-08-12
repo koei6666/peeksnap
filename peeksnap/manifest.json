@@ -11,6 +11,7 @@
     "js": [
       "content/overlay.js",
       "content/sidebar.js",
+      "content/marker.js",
       "content/content_script.js"
     ],
     "run_at": "document_idle",
