@@ -254,7 +254,7 @@ function blobToDataUrl(blob) {
 }
 
 async function handleCapture(message, tabId) {
-  const { rect, dpr, name = "", colorTag = "", captureDocX, captureDocY } = message;
+  const { rect, dpr, name = "", colorTag = "", captureDocX, captureDocY, pageUrl } = message;
 
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
@@ -265,7 +265,7 @@ async function handleCapture(message, tabId) {
 
   const snippet = {
     id: crypto.randomUUID(),
-    pageUrl: tab.url,
+    pageUrl: pageUrl || tab.url,
     pageTitle: tab.title || "",
     label: (() => { try { return new URL(tab.url).hostname; } catch (e) { return tab.url; } })(),
     name,

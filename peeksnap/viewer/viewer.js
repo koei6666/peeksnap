@@ -125,9 +125,47 @@ async function renderAll() {
   }
 }
 
+// ── Marking UI ──────────────────────────────────────────────────────────────
+
+/**
+ * Snippets are keyed by the ORIGINAL PDF url, not this viewer's extension
+ * URL, so a snap taken here still shows up when the same PDF is opened in
+ * Safari's viewer.
+ */
+function mountMarkingUI() {
+  const sidebar = document.createElement("peeksnap-sidebar");
+  document.body.appendChild(sidebar);
+
+  const marker = document.createElement("peeksnap-marker");
+  document.body.appendChild(marker);
+
+  window.PeekSnapMarking.attach(sidebar, marker);
+
+  browser.runtime
+    .sendMessage({ action: "get_snippets", pageUrl: fileUrl })
+    .then((response) => {
+      if (response?.action === "snippets_loaded") sidebar.render(response.snippets);
+    })
+    .catch(() => {
+      // Background not ready — sidebar shows its empty state.
+    });
+
+  document.addEventListener("peeksnap:captured", (e) => {
+    const { rect, dpr, name, colorTag } = e.detail;
+    browser.runtime
+      .sendMessage({ action: "capture", rect, dpr, name, colorTag, pageUrl: fileUrl })
+      .then((response) => {
+        if (response?.action === "snippet_saved") sidebar.addSnippet(response.snippet);
+      })
+      .catch((err) => console.warn("[PeekSnap] capture failed", err));
+  });
+}
+
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 async function boot() {
+  mountMarkingUI();
+
   if (!fileUrl) {
     showError("No PDF was specified.", null);
     return;
