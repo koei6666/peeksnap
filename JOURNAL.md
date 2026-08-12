@@ -86,3 +86,31 @@ snippet.colorTag: string  // hex color (default '')
 - **No `showError()` path in `marker.js`:** the design doc says failures surface via the toast, but no failure mode in `marker.js` has been identified that can throw. Adding a speculative error path was judged YAGNI.
 
 **Not yet verified:** none of this feature has been run. See `docs/superpowers/plans/2026-08-12-on-page-marking-MANUAL-VERIFICATION.md` — start with section J, which covers the ad-defense re-parenting fix.
+
+---
+
+## Session 4 — PDF Viewer
+**Date:** 2026-08-12
+
+**Features added this session:**
+- **Vendored PDF.js 6.2.108** under `peeksnap/vendor/pdfjs/` (library, worker, cmaps, standard fonts, wasm image decoders)
+- **`viewer/viewer.html`** — an opt-in in-extension PDF viewer that renders every page to canvas with a PDF.js text layer
+- **"Open PDF in PeekSnap"** button in the popup, shown only on PDF URLs
+- **`content/marking_controller.js`** — sidebar↔marker wiring extracted so the content script and the viewer share one copy
+
+**Why:**
+Safari's built-in PDF viewer is a plugin: `window.scrollY` is permanently 0 and there is no selectable text. Brush strokes could not follow PDF content and the highlighter could not work at all — on exactly the surface (scanned PDFs) the drawing tool was built for.
+
+**Architecture decisions:**
+- **Opt-in, not automatic takeover.** If our renderer fails on some PDF, the user loses annotation, never the ability to read. Cost of a failure is one click.
+- Reached by a **user-initiated `tabs.update()`**, because Safari rejects `declarativeNetRequest` redirects to `safari-web-extension://` schemes.
+- **`marker.js` was not modified.** Once the PDF is an ordinary document, its document-space stroke anchoring works, and `supportsHighlight()` returns true because the viewer page's contentType is `text/html`. The feature adds a renderer, not marking logic.
+- Snippets captured in the viewer are keyed to the **original PDF URL**, so they appear in either viewer. The background worker takes an optional `pageUrl` override, defaulting to `tab.url` exactly as before.
+- `cmaps`/`standard_fonts`/`wasm` are vendored, not trimmed: scanned PDFs depend on those image decoders and font fallbacks.
+
+**Storage:** no changes. Annotations remain session-only.
+
+**Known limitations:**
+- No thumbnails, search, zoom controls, printing, or form filling.
+- PDFs behind auth the extension cannot reuse will fail to fetch; the viewer shows an error with a link back to Safari's viewer.
+- Annotations still vanish on reload, by design.
