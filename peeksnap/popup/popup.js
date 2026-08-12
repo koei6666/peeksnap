@@ -46,6 +46,26 @@ document.getElementById("capture-btn").addEventListener("click", async () => {
   }
 });
 
+// ── Open PDF in PeekSnap ────────────────────────────────────────────────────
+// Safari REJECTS declarativeNetRequest redirects to safari-web-extension://
+// schemes, so the viewer can only be reached by a user-initiated navigation.
+
+const openPdfBtn = document.getElementById("open-pdf-btn");
+
+browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+  const tab = tabs[0];
+  if (!tab || !tab.url) return;
+  if (!/\.pdf(\?|#|$)/i.test(tab.url)) return;
+
+  openPdfBtn.hidden = false;
+  openPdfBtn.addEventListener("click", () => {
+    const viewerUrl =
+      browser.runtime.getURL("viewer/viewer.html") +
+      "?file=" + encodeURIComponent(tab.url);
+    browser.tabs.update(tab.id, { url: viewerUrl }).then(() => window.close());
+  });
+});
+
 // ── Settings panel toggle ─────────────────────────────────────────────────────
 
 const settingsToggle = document.getElementById("settings-toggle");

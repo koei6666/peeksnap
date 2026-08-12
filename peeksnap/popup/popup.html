@@ -30,7 +30,8 @@
       margin-bottom: 12px;
     }
 
-    #capture-btn {
+    #capture-btn,
+    #open-pdf-btn {
       width: 100%;
       background: #6366f1;
       color: #fff;
@@ -46,8 +47,10 @@
       gap: 6px;
       transition: background 0.15s;
     }
-    #capture-btn:hover { background: #4f46e5; }
-    #capture-btn:active { background: #4338ca; }
+    #capture-btn:hover,
+    #open-pdf-btn:hover { background: #4f46e5; }
+    #capture-btn:active,
+    #open-pdf-btn:active { background: #4338ca; }
 
     .hint {
       margin-top: 10px;
@@ -285,6 +288,7 @@
     <button id="capture-btn">
       <span>&#9654;</span> Capture Region
     </button>
+    <button id="open-pdf-btn" hidden>Open PDF in PeekSnap</button>
     <p class="hint">Drag to select any area on the page.</p>
 
     <button id="manage-btn">
