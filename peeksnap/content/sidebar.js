@@ -282,6 +282,27 @@
       margin-left: 2px;
     }
 
+    /* Fixed 18px hit target; the inner dot previews the brush weight. */
+    #mark-width-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #45475a;
+      padding: 0;
+      cursor: pointer;
+      margin-left: 2px;
+      background: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #mark-width-preview {
+      background: #cdd6f4;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
     #clear-marks-btn {
       margin-left: auto;
       background: none;
@@ -309,6 +330,8 @@
       this._colorIndex = 0;
       this._markColorsReady = false;
       this._markColorAnnounced = false;
+      this._brushWidths = [2, 5, 10];
+      this._widthIndex = 1; // medium
 
       this._buildDOM();
     }
@@ -412,7 +435,15 @@
 
       row.appendChild(this._highlighterBtn);
       row.appendChild(this._brushBtn);
+      this._markWidthDot = document.createElement("button");
+      this._markWidthDot.id = "mark-width-dot";
+      this._markWidthPreview = document.createElement("span");
+      this._markWidthPreview.id = "mark-width-preview";
+      this._markWidthDot.appendChild(this._markWidthPreview);
+      this._markWidthDot.addEventListener("click", () => this._onMarkWidthClick());
+
       row.appendChild(this._markColorDot);
+      row.appendChild(this._markWidthDot);
       row.appendChild(this._clearMarksBtn);
 
       this._initMarkColors();
@@ -442,6 +473,58 @@
     }
 
     /** Reads the shared tag palette. Read-only — never writes settings. */
+    // ── Brush width ───────────────────────────────────────────────────────────
+
+    /**
+     * The preview diameter is presentational, not the literal stroke width:
+     * a true 2px dot is nearly invisible inside the 18px ring. These sizes
+     * keep the three presets clearly distinguishable; the tooltip carries the
+     * exact pixel value.
+     */
+    _renderMarkWidth() {
+      const previewSizes = [4, 7, 12];
+      const names = ["Thin", "Medium", "Thick"];
+      const px = this._brushWidths[this._widthIndex];
+      const size = previewSizes[this._widthIndex];
+      this._markWidthPreview.style.width = size + "px";
+      this._markWidthPreview.style.height = size + "px";
+      this._markWidthDot.title = `Brush weight: ${names[this._widthIndex]} (${px}px)`;
+    }
+
+    _onMarkWidthClick() {
+      this._widthIndex = (this._widthIndex + 1) % this._brushWidths.length;
+      this._renderMarkWidth();
+      this._emitMarkWidth();
+      this._persistBrushWidth();
+    }
+
+    _emitMarkWidth() {
+      this.dispatchEvent(new CustomEvent("peeksnap:mark-width", {
+        detail: { width: this._brushWidths[this._widthIndex] },
+        bubbles: true,
+        composed: true,
+      }));
+    }
+
+    /**
+     * Read-modify-write so the capture flow's tagColors/lastUsedColor survive,
+     * matching how overlay.js persists lastUsedColor.
+     */
+    async _persistBrushWidth() {
+      try {
+        const data = await browser.storage.local.get("peeksnap_settings");
+        const settings = data["peeksnap_settings"] || {};
+        await browser.storage.local.set({
+          ["peeksnap_settings"]: {
+            ...settings,
+            brushWidth: this._brushWidths[this._widthIndex],
+          },
+        });
+      } catch (_) {
+        // Not persisting a brush width is not worth surfacing to the user.
+      }
+    }
+
     async _initMarkColors() {
       try {
         const data = await browser.storage.local.get("peeksnap_settings");
@@ -453,10 +536,13 @@
           const idx = this._tagColors.indexOf(settings.lastUsedColor);
           this._colorIndex = idx >= 0 ? idx : 0;
         }
+        const wIdx = this._brushWidths.indexOf(settings.brushWidth);
+        if (wIdx >= 0) this._widthIndex = wIdx;
       } catch (_) {
         // Defaults already set in the constructor
       }
       this._markColorDot.style.background = this._tagColors[this._colorIndex];
+      this._renderMarkWidth();
       this._markColorsReady = true;
       this._emitInitialMarkColor();
     }
@@ -469,6 +555,8 @@
     _emitInitialMarkColor() {
       if (!this._markColorsReady || !this.isConnected || this._markColorAnnounced) return;
       this._markColorAnnounced = true;
+      // Width rides the same once-only, connected-only guard as the color.
+      this._emitMarkWidth();
       this.dispatchEvent(new CustomEvent("peeksnap:mark-color", {
         detail: { color: this._tagColors[this._colorIndex] },
         bubbles: true,

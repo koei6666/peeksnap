@@ -114,3 +114,19 @@ Safari's built-in PDF viewer is a plugin: `window.scrollY` is permanently 0 and 
 - No thumbnails, search, zoom controls, printing, or form filling.
 - PDFs behind auth the extension cannot reuse will fail to fetch; the viewer shows an error with a link back to Safari's viewer.
 - Annotations still vanish on reload, by design.
+
+---
+
+## Session 5 — Configurable Brush Weight
+**Date:** 2026-08-13
+
+**Feature:** brush weight is now user-configurable. A dot in the sidebar tool row cycles Thin (2px) / Medium (5px) / Thick (10px); the dot's inner circle previews the current weight and the tooltip gives the exact pixel value.
+
+**Design decisions:**
+- Cycling dot rather than a slider, mirroring the existing colour dot — smallest footprint in a 260px panel, one click to change, no new control type.
+- Weight applies to SUBSEQUENT strokes only. Each stroke already recorded its own `width` at creation, exactly like its colour, so no retroactive change and no migration.
+- The preview diameter is presentational (4/7/12px), not the literal stroke width — a true 2px dot is nearly invisible inside the 18px ring. The tooltip carries the real value.
+- Plumbed through the existing path: `sidebar.js` emits `peeksnap:mark-width` (`composed: true`) → `marking_controller.js` → `marker.setWidth()`. The sidebar still knows nothing about marking.
+- The initial width rides the same once-only, connected-only guard as the initial colour, so it cannot be announced before listeners exist.
+
+**Storage:** adds `peeksnap_settings.brushWidth`. This is a deliberate, narrow relaxation of the "marking never writes settings" rule: it writes one new key via read-modify-write, spreading the rest through untouched, matching how `overlay.js` already persists `lastUsedColor`. Verified that `tagColors` and `lastUsedColor` survive the write.

@@ -33,7 +33,7 @@
 (function () {
   if (customElements.get("peeksnap-marker")) return;
 
-  const STROKE_WIDTH = 3;
+  const STROKE_WIDTH = 3; // fallback only; the live value is this._width
   const HIGHLIGHT_ALPHA = 0.35;
   const HIGHLIGHT_PREFIX = "peeksnap-mark";
 
@@ -90,6 +90,7 @@
       this._marks = [];
       this._tool = null;
       this._color = "#fde047";
+      this._width = STROKE_WIDTH;
       this._drawing = false;
       this._current = null;
       this._canHighlight = supportsHighlight();
@@ -182,6 +183,15 @@
       if (typeof hex === "string" && hex) this._color = hex;
     }
 
+    /**
+     * Sets the brush width for SUBSEQUENT strokes. Existing strokes keep the
+     * width recorded on them at creation, the same way they keep their color.
+     */
+    setWidth(px) {
+      const n = Number(px);
+      if (Number.isFinite(n) && n > 0) this._width = n;
+    }
+
     get canHighlight() {
       return this._canHighlight;
     }
@@ -219,7 +229,7 @@
         type: "stroke",
         points: [{ x: e.clientX + window.scrollX, y: e.clientY + window.scrollY }],
         color: this._color,
-        width: STROKE_WIDTH,
+        width: this._width,
       };
       this._marks.push(this._current);
 

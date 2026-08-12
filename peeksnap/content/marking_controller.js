@@ -36,6 +36,10 @@
       marker.setColor(e.detail.color);
     });
 
+    sidebar.addEventListener("peeksnap:mark-width", (e) => {
+      marker.setWidth(e.detail.width);
+    });
+
     sidebar.addEventListener("peeksnap:clear-marks", () => {
       marker.clear();
     });
