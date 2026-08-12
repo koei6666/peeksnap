@@ -52,10 +52,40 @@ document.getElementById("capture-btn").addEventListener("click", async () => {
 
 const openPdfBtn = document.getElementById("open-pdf-btn");
 
-browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+/**
+ * Asks the content script what the page actually is. This is authoritative:
+ * a URL regex misses the many PDFs served without a .pdf extension
+ * (arxiv.org/pdf/1234, /download?id=…), and document.contentType is what
+ * decides how Safari really renders the page. Falls back to the URL when the
+ * content script cannot be reached (not yet injected, or a restricted page).
+ */
+async function activeTabIsPdf(tab) {
+  try {
+    const res = await browser.tabs.sendMessage(tab.id, { action: "is_pdf" });
+    if (res && typeof res.isPdf === "boolean") return res.isPdf;
+  } catch (_) {
+    // Content script unreachable — fall through to the URL heuristic.
+  }
+  return /\.pdf(\?|#|$)/i.test(tab.url || "");
+}
+
+browser.tabs.query({ active: true, currentWindow: true }).then(async (tabs) => {
   const tab = tabs[0];
-  if (!tab || !tab.url) return;
-  if (!/\.pdf(\?|#|$)/i.test(tab.url)) return;
+
+  // Logged rather than failing silently: this button being hidden has already
+  // read as "the feature is missing" once.
+  if (!tab) {
+    console.log("[PeekSnap] no active tab — Open PDF button hidden");
+    return;
+  }
+  if (!tab.url) {
+    console.log("[PeekSnap] tab.url unavailable (grant PeekSnap access to this site) — Open PDF button hidden");
+    return;
+  }
+
+  const isPdf = await activeTabIsPdf(tab);
+  console.log(`[PeekSnap] active tab isPdf=${isPdf} url=${tab.url}`);
+  if (!isPdf) return;
 
   openPdfBtn.hidden = false;
   openPdfBtn.addEventListener("click", () => {

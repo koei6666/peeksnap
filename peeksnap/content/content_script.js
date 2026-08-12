@@ -14,7 +14,7 @@
   // ── Mount Sidebar ───────────────────────────────────────────────────────────
 
   // Build marker — confirms in the console which bundle Safari actually loaded.
-  console.log("[PeekSnap] v0.3.0 content scripts loaded — marking enabled");
+  console.log("[PeekSnap] v0.3.1 content scripts loaded — marking enabled");
 
   // Guard against double-injection
   if (document.querySelector("peeksnap-sidebar")) return;
@@ -66,6 +66,15 @@
 
   browser.runtime.onMessage.addListener((message) => {
     switch (message.action) {
+      // Authoritative PDF check for the popup. A URL regex misses the many
+      // PDFs served without a .pdf extension (arxiv.org/pdf/1234, download
+      // endpoints), and contentType is what actually decides how Safari
+      // renders the page.
+      case "is_pdf":
+        return Promise.resolve({
+          isPdf: document.contentType === "application/pdf",
+        });
+
       case "activate_selection":
         activateSelection();
         break;
