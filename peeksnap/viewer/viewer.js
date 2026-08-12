@@ -18,10 +18,33 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(VENDOR + "pdf.worker.mjs", impo
 const pagesEl = document.getElementById("pages");
 const errorEl = document.getElementById("error");
 
-const fileUrl = new URLSearchParams(location.search).get("file");
+const rawFileParam = new URLSearchParams(location.search).get("file");
+
+/**
+ * The `file` parameter is attacker-influenceable, so only real remote/file
+ * document URLs are ever fetched or linked. Anything else — notably
+ * javascript: — would run in the extension origin with full browser.* access.
+ */
+function safeDocumentUrl(raw) {
+  if (!raw) return null;
+  let u;
+  try {
+    u = new URL(raw, location.href);
+  } catch (_) {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:" && u.protocol !== "file:") {
+    return null;
+  }
+  return u.href;
+}
+
+const fileUrl = safeDocumentUrl(rawFileParam);
 
 let pdfDoc = null;
 let renderToken = 0;
+let marker = null;
+let lastRenderWidth = 0;
 
 // ── Error UI ────────────────────────────────────────────────────────────────
 
@@ -35,9 +58,10 @@ function showError(message, originalUrl) {
   p.textContent = message;
   errorEl.appendChild(p);
 
-  if (originalUrl) {
+  const safeUrl = safeDocumentUrl(originalUrl);
+  if (safeUrl) {
     const a = document.createElement("a");
-    a.href = originalUrl;
+    a.href = safeUrl;
     a.textContent = "Open in Safari's viewer";
     errorEl.appendChild(a);
   }
@@ -67,6 +91,8 @@ async function renderPage(page, token) {
   canvas.style.width = Math.floor(viewport.width) + "px";
   canvas.style.height = Math.floor(viewport.height) + "px";
   wrap.appendChild(canvas);
+
+  if (token !== renderToken) return null;
   pagesEl.appendChild(wrap);
 
   const ctx = canvas.getContext("2d");
@@ -99,12 +125,14 @@ async function buildTextLayer(wrap, page, viewport) {
 
 async function renderAll() {
   const token = ++renderToken;
+  lastRenderWidth = window.innerWidth;
   pagesEl.textContent = "";
 
   for (let n = 1; n <= pdfDoc.numPages; n++) {
     if (token !== renderToken) return;
     try {
       const page = await pdfDoc.getPage(n);
+      if (token !== renderToken) return;
       const rendered = await renderPage(page, token);
       if (rendered) {
         try {
@@ -136,19 +164,21 @@ function mountMarkingUI() {
   const sidebar = document.createElement("peeksnap-sidebar");
   document.body.appendChild(sidebar);
 
-  const marker = document.createElement("peeksnap-marker");
+  marker = document.createElement("peeksnap-marker");
   document.body.appendChild(marker);
 
   window.PeekSnapMarking.attach(sidebar, marker);
 
-  browser.runtime
-    .sendMessage({ action: "get_snippets", pageUrl: fileUrl })
-    .then((response) => {
-      if (response?.action === "snippets_loaded") sidebar.render(response.snippets);
-    })
-    .catch(() => {
-      // Background not ready — sidebar shows its empty state.
-    });
+  if (fileUrl) {
+    browser.runtime
+      .sendMessage({ action: "get_snippets", pageUrl: fileUrl })
+      .then((response) => {
+        if (response?.action === "snippets_loaded") sidebar.render(response.snippets);
+      })
+      .catch(() => {
+        // Background not ready — sidebar shows its empty state.
+      });
+  }
 
   document.addEventListener("peeksnap:captured", (e) => {
     const { rect, dpr, name, colorTag } = e.detail;
@@ -161,13 +191,37 @@ function mountMarkingUI() {
   });
 }
 
+/**
+ * The viewer is an extension page — content_script.js is never injected into
+ * it — so it has to handle "activate_selection" itself, mirroring
+ * activateSelection() in content_script.js, for the popup's "Capture Region"
+ * button to do anything here.
+ */
+function activateSelection() {
+  // Avoid stacking multiple overlays
+  if (document.querySelector("peeksnap-overlay")) return;
+
+  const overlay = document.createElement("peeksnap-overlay");
+  document.body.appendChild(overlay);
+}
+
+browser.runtime.onMessage.addListener((message) => {
+  if (message?.action === "activate_selection") {
+    activateSelection();
+  }
+});
+
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 async function boot() {
   mountMarkingUI();
 
   if (!fileUrl) {
-    showError("No PDF was specified.", null);
+    if (rawFileParam) {
+      showError("This address could not be opened.", null);
+    } else {
+      showError("No PDF was specified.", null);
+    }
     return;
   }
 
@@ -203,11 +257,46 @@ async function boot() {
   await renderAll();
 }
 
+/**
+ * Re-rendering wipes #pages, which detaches the text-layer nodes marker's
+ * highlight Ranges point into (highlights silently stop painting) and leaves
+ * stroke document-coordinates referring to now-rescaled content. That loss
+ * must be explicit, so it's kept rare (width changes only, not height-only
+ * resizes) and always surfaced to the user.
+ */
+function notifyMarksCleared() {
+  const notice = document.createElement("div");
+  notice.textContent = "Marks cleared — page was re-rendered at a new size.";
+  Object.assign(notice.style, {
+    position: "fixed",
+    bottom: "24px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#f38ba8",
+    color: "#1e1e2e",
+    padding: "8px 16px",
+    borderRadius: "6px",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "13px",
+    fontWeight: "600",
+    zIndex: "2147483647",
+    pointerEvents: "none",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+  });
+  document.body.appendChild(notice);
+  setTimeout(() => notice.remove(), 4000);
+}
+
 let resizeTimer = 0;
 window.addEventListener("resize", () => {
   if (!pdfDoc) return;
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => renderAll(), 200);
+  resizeTimer = setTimeout(() => {
+    if (window.innerWidth === lastRenderWidth) return;
+    marker?.clear?.();
+    notifyMarksCleared();
+    renderAll();
+  }, 200);
 });
 
 boot();

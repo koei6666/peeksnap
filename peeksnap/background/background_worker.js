@@ -263,11 +263,13 @@ async function handleCapture(message, tabId) {
   const fullBlob = await captureRegion(rect, dpr);
   const thumbBlob = await generateThumbnail(fullBlob);
 
+  const effectiveUrl = pageUrl || tab.url;
+
   const snippet = {
     id: crypto.randomUUID(),
-    pageUrl: pageUrl || tab.url,
+    pageUrl: effectiveUrl,
     pageTitle: tab.title || "",
-    label: (() => { try { return new URL(tab.url).hostname; } catch (e) { return tab.url; } })(),
+    label: (() => { try { return new URL(effectiveUrl).hostname; } catch (e) { return effectiveUrl; } })(),
     name,
     colorTag,
     captureDocX,
