@@ -34,6 +34,7 @@
   if (customElements.get("peeksnap-marker")) return;
 
   const STROKE_WIDTH = 3; // fallback only; the live value is this._width
+  const STROKE_ALPHA = 0.45;
   const HIGHLIGHT_ALPHA = 0.35;
   const HIGHLIGHT_PREFIX = "peeksnap-mark";
 
@@ -353,6 +354,20 @@
       const sy = window.scrollY;
 
       this._ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      // Translucent so marks annotate the page instead of hiding it.
+      //
+      // Applied per stroke rather than to the canvas as a whole: each mark is
+      // ONE path, so a stroke that crosses itself still paints flat, while two
+      // separate strokes crossing each other darken at the intersection — the
+      // way a real marker pen behaves. A canvas-wide CSS opacity would flatten
+      // that layering away.
+      //
+      // save/restore rather than resetting by hand, so the in-progress stroke
+      // (which re-enters this method on every pointermove) can never compound
+      // alpha across frames.
+      this._ctx.save();
+      this._ctx.globalAlpha = STROKE_ALPHA;
       this._ctx.lineCap = "round";
       this._ctx.lineJoin = "round";
 
@@ -378,6 +393,8 @@
         }
         this._ctx.stroke();
       }
+
+      this._ctx.restore();
     }
 
     _onScroll() {
