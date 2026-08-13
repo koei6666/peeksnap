@@ -46,11 +46,38 @@ document.getElementById("capture-btn").addEventListener("click", async () => {
   }
 });
 
-// ── Open PDF in PeekSnap ────────────────────────────────────────────────────
+// ── PDF viewer toggle ───────────────────────────────────────────────────────
 // Safari REJECTS declarativeNetRequest redirects to safari-web-extension://
 // schemes, so the viewer can only be reached by a user-initiated navigation.
+//
+// One control, three states — the LABEL is the mode indicator. A button that
+// merely disappears in the viewer reads as "the feature is missing", and one
+// that stays styled-but-inert reads as broken; neither tells you which viewer
+// you are looking at. Stating it is the whole point of this control:
+//
+//   PDF in Safari's viewer  →  "Open PDF in PeekSnap"     → our viewer
+//   our viewer              →  "Open in Safari's viewer"  → the original PDF
+//   anything else           →  hidden
 
 const openPdfBtn = document.getElementById("open-pdf-btn");
+const openPdfHint = document.getElementById("open-pdf-hint");
+
+const { isViewerUrl, originalPdfUrlFromViewer, looksLikePdfUrl } = globalThis.PeekSnapPdfUrl;
+
+const VIEWER_URL = browser.runtime.getURL("viewer/viewer.html");
+
+/** Shows the toggle with a label, and navigates the active tab on click. */
+function showToggle(tab, { label, hint, target }) {
+  openPdfBtn.textContent = label;
+  openPdfBtn.hidden = false;
+  if (hint) {
+    openPdfHint.textContent = hint;
+    openPdfHint.hidden = false;
+  }
+  openPdfBtn.addEventListener("click", () => {
+    browser.tabs.update(tab.id, { url: target }).then(() => window.close());
+  });
+}
 
 /**
  * Asks the content script what the page actually is. This is authoritative:
@@ -66,7 +93,7 @@ async function activeTabIsPdf(tab) {
   } catch (_) {
     // Content script unreachable — fall through to the URL heuristic.
   }
-  return /\.pdf(\?|#|$)/i.test(tab.url || "");
+  return looksLikePdfUrl(tab.url || "");
 }
 
 browser.tabs.query({ active: true, currentWindow: true }).then(async (tabs) => {
@@ -83,16 +110,36 @@ browser.tabs.query({ active: true, currentWindow: true }).then(async (tabs) => {
     return;
   }
 
+  // Checked BEFORE the content-script probe: no probe reaches an extension
+  // page anyway, and the URL fallback would see the ".pdf" that the viewer's
+  // own `file=` param ends with and call the viewer itself a PDF.
+  if (isViewerUrl(tab.url, VIEWER_URL)) {
+    const original = originalPdfUrlFromViewer(tab.url, VIEWER_URL);
+    if (!original) {
+      // No usable `file` param — the viewer is on its error page, so there is
+      // nothing to go back to. Offering an exit that goes nowhere is worse
+      // than offering none.
+      console.log("[PeekSnap] in the viewer with no valid file param — toggle hidden");
+      return;
+    }
+    console.log(`[PeekSnap] in the PeekSnap viewer — offering return to ${original}`);
+    showToggle(tab, {
+      label: "Open in Safari's viewer",
+      // Marks are session-only (marker.js), so navigating away drops them.
+      // Saved snaps survive: they are keyed by the ORIGINAL pdf url.
+      hint: "Leaving PeekSnap discards marks. Saved snaps are kept.",
+      target: original,
+    });
+    return;
+  }
+
   const isPdf = await activeTabIsPdf(tab);
   console.log(`[PeekSnap] active tab isPdf=${isPdf} url=${tab.url}`);
   if (!isPdf) return;
 
-  openPdfBtn.hidden = false;
-  openPdfBtn.addEventListener("click", () => {
-    const viewerUrl =
-      browser.runtime.getURL("viewer/viewer.html") +
-      "?file=" + encodeURIComponent(tab.url);
-    browser.tabs.update(tab.id, { url: viewerUrl }).then(() => window.close());
+  showToggle(tab, {
+    label: "Open PDF in PeekSnap",
+    target: VIEWER_URL + "?file=" + encodeURIComponent(tab.url),
   });
 });
 

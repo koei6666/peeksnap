@@ -30,8 +30,10 @@
       margin-bottom: 12px;
     }
 
-    #capture-btn,
-    #open-pdf-btn {
+    /* Capture Region is the ONLY primary action. The viewer toggle used to
+       share this rule, which gave two full-indigo buttons flush against each
+       other — no hierarchy, and no clue which one was the mode switch. */
+    #capture-btn {
       width: 100%;
       background: #6366f1;
       color: #fff;
@@ -47,10 +49,38 @@
       gap: 6px;
       transition: background 0.15s;
     }
-    #capture-btn:hover,
-    #open-pdf-btn:hover { background: #4f46e5; }
-    #capture-btn:active,
-    #open-pdf-btn:active { background: #4338ca; }
+    #capture-btn:hover  { background: #4f46e5; }
+    #capture-btn:active { background: #4338ca; }
+
+    /* Secondary: deliberately the same treatment as #manage-btn rather than a
+       third button style, so the popup reads as two tiers, not three. */
+    #open-pdf-btn {
+      margin-top: 14px;
+      width: 100%;
+      background: #313244;
+      border: 1px solid #45475a;
+      color: #a6adc8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    #open-pdf-btn:hover  { background: #45475a; color: #cdd6f4; }
+    #open-pdf-btn:active { background: #585b70; }
+
+    /* REQUIRED, not redundant. The `hidden` attribute works via the UA rule
+       [hidden] { display: none }, and ANY author rule that sets `display`
+       beats it — author beats UA regardless of specificity. Without this the
+       `display: flex` above leaves the button fully visible and fully styled
+       while popup.js believes it is hidden: a live-looking button that does
+       nothing, because no click listener was ever attached to it. */
+    #open-pdf-btn[hidden] { display: none; }
 
     .hint {
       margin-top: 10px;
@@ -59,6 +89,10 @@
       text-align: center;
       line-height: 1.4;
     }
+    /* Tighter than .hint's default gap: this one belongs to the button
+       directly above it, not to the block. */
+    #open-pdf-hint { margin-top: 6px; }
+    .hint[hidden] { display: none; }
 
     #manage-btn {
       margin-top: 12px;
@@ -288,8 +322,11 @@
     <button id="capture-btn">
       <span>&#9654;</span> Capture Region
     </button>
-    <button id="open-pdf-btn" hidden>Open PDF in PeekSnap</button>
     <p class="hint">Drag to select any area on the page.</p>
+
+    <!-- Label is set by popup.js — it names the mode you would switch TO. -->
+    <button id="open-pdf-btn" hidden>Open PDF in PeekSnap</button>
+    <p class="hint" id="open-pdf-hint" hidden></p>
 
     <button id="manage-btn">
       <span>Manage Snaps</span>
@@ -317,6 +354,8 @@
     <div id="manager-empty" class="hidden">No snaps saved yet.</div>
   </div>
 
+  <!-- pdf_url.js must load first: popup.js reads globalThis.PeekSnapPdfUrl at top level. -->
+  <script src="pdf_url.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
